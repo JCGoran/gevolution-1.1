@@ -1,6 +1,6 @@
 # programming environment
-COMPILER     := mpic++
-INCLUDE      := # add the path to LATfield2 and other libraries (if necessary)
+COMPILER = CC
+INCLUDE      := -I$(HOME)/code/LATfield2
 LIB          := -lfftw3 -lm -lhdf5 -lgsl -lgslcblas
 
 # target and source

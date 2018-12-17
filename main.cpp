@@ -33,6 +33,9 @@
 //////////////////////////
 
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #ifdef HAVE_CLASS
 #include "class.h"
 #undef MAX			// due to macro collision this has to be done BEFORE including LATfield2 headers!
@@ -167,6 +170,8 @@ int main(int argc, char **argv)
 	numparam = loadParameterFile(settingsfile, params);
 	
 	usedparams = parseMetadata(params, numparam, sim, cosmo, ic);
+
+        parseOutputPath(sim.output_path);
 	
 	COUT << " parsing of settings file completed. " << numparam << " parameters found, " << usedparams << " were used." << endl;
 	
@@ -229,6 +234,16 @@ int main(int argc, char **argv)
 	BiFT_check.initialize(latFT,3);
 	PlanFFT<Cplx> plan_Bi_check(&Bi_check, &BiFT_check);
 #endif
+
+    Field<Real> scalarcross[sim.num_pk];
+    Field<Cplx> scalarFTcross[sim.num_pk];
+    PlanFFT<Cplx> plan_scalarcross[sim.num_pk];
+    for (int i = 0; i<sim.num_pk; ++i){
+        scalarcross[i].initialize(lat, 1);
+        scalarFTcross[i].initialize(latFT, 1);
+        plan_scalarcross[i].initialize(&scalarcross[i], &scalarFTcross[i]);
+    }
+
 
 	update_cdm_fields[0] = &phi;
 	update_cdm_fields[1] = &chi;
@@ -599,7 +614,7 @@ int main(int argc, char **argv)
 #ifdef CHECK_B			
 			writeSpectra(sim, cosmo, fourpiG, a, pkcount, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, &Bi_check, &BiFT_check, &plan_Bi_check);
 #else
-			writeSpectra(sim, cosmo, fourpiG, a, pkcount, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij);
+			writeSpectra(sim, cosmo, fourpiG, a, pkcount, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, scalarFTcross);
 #endif
 
 			pkcount++;
