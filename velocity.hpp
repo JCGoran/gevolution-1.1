@@ -1,3 +1,7 @@
+#include "geometry.h"
+#include "refine.h"
+#include "grid.h"
+
 psi_int psi_aabb_periodic(psi_rvec* pos, psi_rvec* rbox, psi_rvec* window, psi_rvec* box);
 
 template<typename part, typename part_info, typename part_dataType>
