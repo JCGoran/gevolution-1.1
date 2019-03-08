@@ -17,9 +17,9 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
     grid.dim = 3;
     grid.fields[0] = density->data();
     grid.fields[1] = velocity->data();
-    grid.n.i = xPart.localSize(0);
-    grid.n.j = xPart.localSize(1);
-    grid.n.k = xPart.localSize(2);
+    grid.n.i = pcls->lattice().localSize(0);
+    grid.n.j = pcls->lattice().localSize(1);
+    grid.n.k = pcls->lattice().localSize(2);
     grid.window[0].x = 0.;
     grid.window[0].y = 1.0*coordSkip(0)/size(1);
     grid.window[0].z = 1.0*coordSkip(1)/size(2);
