@@ -8,15 +8,18 @@ psi_int psi_aabb_periodic(psi_rvec* pos, psi_rvec* rbox, psi_rvec* window, psi_r
 template<typename part, typename part_info, typename part_dataType>
 void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double boxsize, Field<Real> *density, Field<Real> *velocity)
 {
+    Site xPart(pcls->lattice());
+    typename std::list<part>::iterator it;
+
     psi_grid grid;
     memset(&grid, 0, sizeof(grid));
     grid.type = 0;
     grid.dim = 3;
     grid.fields[0] = density->data();
     grid.fields[1] = velocity->data();
-    grid.n.i = localSize(0);
-    grid.n.j = localSize(1);
-    grid.n.k = localSize(2);
+    grid.n.i = xPart.localSize(0);
+    grid.n.j = xPart.localSize(1);
+    grid.n.k = xPart.localSize(2);
     grid.window[0].x = 0.;
     grid.window[0].y = 1.0*coordSkip(0)/size(1);
     grid.window[0].z = 1.0*coordSkip(1)/size(2);
@@ -57,8 +60,7 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
     box[1].y = 1.;
     box[1].z = 1.;
 
-    Site xPart(pcls->lattice());
-    typename std::list<part>::iterator it;
+
 
     psi_rvec pos[8], vel[8];
 
