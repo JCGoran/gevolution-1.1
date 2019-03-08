@@ -21,11 +21,11 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
     grid.n.j = pcls->lattice().localSize(1);
     grid.n.k = pcls->lattice().localSize(2);
     grid.window[0].x = 0.;
-    grid.window[0].y = 1.0*coordSkip(0)/size(1);
-    grid.window[0].z = 1.0*coordSkip(1)/size(2);
+    grid.window[0].y = 1.0*pcls->lattice().coordSkip(0)/pcls->lattice().size(1);
+    grid.window[0].z = 1.0*pcls->lattice().coordSkip(1)/pcls->lattice().size(2);
     grid.window[1].x = 1.;
-    grid.window[1].y = 1.0*(coordSkip(0) + sizeLocal(1))/size(1);
-    grid.window[1].z = 1.0*(coordSkip(1) + sizeLocal(2))/size(2);
+    grid.window[1].y = 1.0*(pcls->lattice().coordSkip(0) + pcls->lattice().sizeLocal(1))/pcls->lattice().size(1);
+    grid.window[1].z = 1.0*(pcls->lattice().coordSkip(1) + pcls->lattice().sizeLocal(2))/pcls->lattice().size(2);
     grid.d.x = (grid.window[1].x - grid.window[0].x)/grid.n.i;
     grid.d.y = (grid.window[1].y - grid.window[0].y)/grid.n.j;
     grid.d.z = (grid.window[1].z - grid.window[0].z)/grid.n.k;
