@@ -48,7 +48,6 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
 	psi_rvec grbox[8];
 
 	// constant-size buffer for max refinement level
-	psi_rtree_query qry;
 	psi_tet_buffer tetbuf, tetbuf1;
 	psi_tet_buffer_init(&tetbuf, 0, 0);
 
