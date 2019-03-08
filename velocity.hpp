@@ -3,6 +3,7 @@
 #include "refine.h"
 #include "grid.h"
 
+void psi_aabb(psi_rvec* pos, psi_int nverts, psi_rvec* rbox);
 psi_int psi_aabb_periodic(psi_rvec* pos, psi_rvec* rbox, psi_rvec* window, psi_rvec* box);
 
 template<typename part, typename part_info, typename part_dataType>
@@ -444,3 +445,21 @@ void psi_voxelize_tet(psi_rvec* pos, psi_rvec* vel, psi_real mass, psi_rvec* rbo
 }
 
 ****/
+
+void psi_aabb(psi_rvec* pos, psi_int nverts, psi_rvec* rbox) {
+	// get the bounding box 
+	psi_int i, v;
+	for(i = 0; i < 3; ++i) {
+		rbox[0].xyz[i] = 1.0e30;
+		rbox[1].xyz[i] = -1.0e30;
+	}
+	for(v = 0; v < nverts; ++v)
+	for(i = 0; i < 3; ++i) {
+		// TODO: This is naive wrt quadratic elements!
+		// Could cause mass loss around the edges
+		if(pos[v].xyz[i] < rbox[0].xyz[i]) rbox[0].xyz[i] = pos[v].xyz[i];
+		if(pos[v].xyz[i] > rbox[1].xyz[i]) rbox[1].xyz[i] = pos[v].xyz[i];
+	}
+}
+
+
