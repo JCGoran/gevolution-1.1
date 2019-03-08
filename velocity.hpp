@@ -1,6 +1,27 @@
+psi_int psi_aabb_periodic(psi_rvec* pos, psi_rvec* rbox, psi_rvec* window, psi_rvec* box);
+
 template<typename part, typename part_info, typename part_dataType>
-void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double boxsize)
+void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double boxsize, Field<Real> *density, Field<Real> *velocity)
 {
+    psi_grid grid;
+    memset(&grid, 0, sizeof(grid));
+    grid.type = 0;
+    grid.dim = 3;
+    grid.fields[0] = density.data();
+    grid.fields[1] = velocity.data();
+    grid.n.i = localSize(0);
+    grid.n.j = localSize(1);
+    grid.n.k = localSize(2);
+    grid.window[0].x = 0.;
+    grid.window[0].y = 1.0*coordSkip(0)/size(1);
+    grid.window[0].z = 1.0*coordSkip(1)/size(2);
+    grid.window[1].x = 1.;
+    grid.window[1].y = 1.0*(coordSkip(0) + sizeLocal(1))/size(1);
+    grid.window[1].z = 1.0*(coordSkip(1) + sizeLocal(2))/size(2);
+    grid.d.x = (grid.window[1].x - grid.window[0].x)/grid.n.i;
+    grid.d.y = (grid.window[1].y - grid.window[0].y)/grid.n.j;
+    grid.d.z = (grid.window[1].z - grid.window[0].z)/grid.n.k;
+
 	psi_int e, nghosts, tind, internal_rtree, e1, t1;
 
 	// a local copy of the position in case it is modified due to periodicity
@@ -15,38 +36,38 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
     const int meshdim = 3;
 
 	// ghost tetrahedra for handling periodicity
-	psi_rvec gpos[(1<<meshdim)*(meshdim+1)];
-	psi_rvec grbox[(1<<meshdim)*2];
+	psi_rvec gpos[32];
+	psi_rvec grbox[8];
 
 	// constant-size buffer for max refinement level
 	psi_rtree_query qry;
 	psi_tet_buffer tetbuf, tetbuf1;
 	psi_tet_buffer_init(&tetbuf, 0, 0);
 
-    double window[2][3];
-    window[0][0] = 0.;
-    window[0][1] = 0.;
-    window[0][2] = 0.;
-    window[1][0] = 256.;
-    window[1][1] = 256.;
-    window[1][2] = 256.;
+    psi_rvec box[2];
+    box[0].x = 0.;
+    box[0].y = 0.;
+    box[0].z = 0.;
+    box[1].x = 1.;
+    box[1].y = 1.;
+    box[1].z = 1.;
 
     Site xPart(pcls->lattice());
     typename std::list<part>::iterator it;
 
-    double pos[8][3], vel[8][3];
+    psi_rvec pos[8], vel[8];
 
     for (xPart.first(); xPart.test(); xPart.next()){
         for (it = (pcls->field())(xPart).parts.begin(); it != (pcls->field())(xPart).parts.end(); ++it){
             for (psi_int i = 0; i < 8; ++i){
                 // find the right 8 particles
                 if (it->ID == ID[i]){
-                    pos[i][0] = it->pos[0];
-                    pos[i][1] = it->pos[1];
-                    pos[i][2] = it->pos[2];
-                    vel[i][0] = it->vel[0];
-                    vel[i][1] = it->vel[1];
-                    vel[i][2] = it->vel[2];
+                    pos[i].x = it->pos[0];
+                    pos[i].y = it->pos[1];
+                    pos[i].z = it->pos[2];
+                    vel[i].x = it->vel[0];
+                    vel[i].y = it->vel[1];
+                    vel[i].z = it->vel[2];
                 }
             }
         }
@@ -57,33 +78,59 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
             // a local copy of the element, in case it's modified
             // make it periodic, get its bounding box, and check it against the grid
             tmass = 1;//mesh->mass[e]; 
-            if(!psi_aabb_periodic(pos, trbox, grid->window, mesh)){
+            if(!psi_aabb_periodic(pos, trbox, grid.window, box)){
                 continue;
             }
 
             // refine elements into the tet buffer 
-            psi_tet_buffer_refine(&tetbuf, tpos, tvel, tmass, 8);
+            psi_tet_buffer_refine(&tetbuf, pos, vel, tmass, 8);
 
-            // linear in the density
-            if(mode == PSI_MODE_DENSITY){
-
-                // loop over each tet in the buffer
-                // copy the position to the ghost array and compute its aabb
-                // make ghosts and sample tets to the grid
-                for(psi_int t = 0; t < tetbuf.num; ++t){
-                    memcpy(gpos, &tetbuf.pos[(meshdim+1)*t], (meshdim+1)*sizeof(psi_rvec));
-                    psi_aabb(gpos, meshdim+1,grbox);
-                    //psi_make_ghosts(gpos, grbox, &nghosts, (meshdim+1), grid->window, mesh);
-                    nghosts = 1;
-                    for(psi_int g = 0; g < nghosts; ++g){
-                        psi_voxelize_tet(&gpos[(meshdim+1)*g], &tetbuf.vel[(meshdim+1)*t], tetbuf.mass[t], &grbox[2*g], grid);
-                    }
+            // loop over each tet in the buffer
+            // copy the position to the ghost array and compute its aabb
+            // make ghosts and sample tets to the grid
+            for(psi_int t = 0; t < tetbuf.num; ++t){
+                memcpy(gpos, &tetbuf.pos[(meshdim+1)*t], (meshdim+1)*sizeof(psi_rvec));
+                psi_aabb(gpos, meshdim+1,grbox);
+                //psi_make_ghosts(gpos, grbox, &nghosts, (meshdim+1), grid->window, mesh);
+                nghosts = 1;
+                for(psi_int g = 0; g < nghosts; ++g){
+                    psi_voxelize_tet(&gpos[(meshdim+1)*g], &tetbuf.vel[(meshdim+1)*t], tetbuf.mass[t], &grbox[2*g], &grid);
                 }
             }
         }
     }
 }
 
+
+psi_int psi_aabb_periodic(psi_rvec* pos, psi_rvec* rbox, psi_rvec* window, psi_rvec* box) {
+
+	// pos and rbox can both be modified!
+	psi_int i, v;
+	psi_real span;
+
+	psi_aabb(pos, 8, rbox);
+
+	// if the grid is periodic, move the vertices as needed
+    for(i = 0; i < 3; ++i) {
+        span = box[1].xyz[i] - box[0].xyz[i];
+        if(rbox[1].xyz[i] - rbox[0].xyz[i] > 0.5*span) {
+            rbox[0].xyz[i] = 1.0e30;
+            rbox[1].xyz[i] = -1.0e30;
+            for(v = 0; v < 8; ++v) {
+                // wrap elements that cross the right-hand boundary while recomputing the box
+                if(pos[v].xyz[i] > box[0].xyz[i] + 0.5*span) pos[v].xyz[i] -= span;
+                if(pos[v].xyz[i] < rbox[0].xyz[i]) rbox[0].xyz[i] = pos[v].xyz[i];
+                if(pos[v].xyz[i] > rbox[1].xyz[i]) rbox[1].xyz[i] = pos[v].xyz[i];
+            }
+        }
+        if(rbox[0].xyz[i] > window[1].xyz[i]) return 0; 
+        if(rbox[1].xyz[i] < window[0].xyz[i]
+            && rbox[0].xyz[i]+span > window[1].xyz[i]) return 0; 
+    }
+	return 1;
+}
+
+/***
 void psi_voxels(psi_grid* grid, Particles<part, part_info, part_dataTyle> *pcls)
 {
 	//setbuf(stdout, NULL);
@@ -232,3 +279,162 @@ void Particles<part,part_info,part_dataType>::coutPart(long ID)
 }
 
 
+void psi_make_ghosts(psi_rvec* elems, psi_rvec* rboxes, psi_int* num, psi_int stride, psi_rvec* window, psi_mesh* mesh) {
+
+	psi_int i, p, v, pflags;
+	psi_real pshift;
+	psi_rvec span;
+
+	// if periodic, make ghosts on the fly
+	(*num) = 1;
+	pflags = 0;
+	if(mesh->periodic) {
+		for(i = 0; i < mesh->dim; ++i) {
+			span.xyz[i] = mesh->box[1].xyz[i]-mesh->box[0].xyz[i]; 
+			if(rboxes[0].xyz[i] < mesh->box[0].xyz[i]) pflags |= (1 << i);
+		}
+		for(p = 1; p < (1<<mesh->dim); ++p) {
+			if((pflags & p) == p) {
+				for(i = 0; i < mesh->dim; ++i) {
+					pshift = span.xyz[i]*(1 & (p >> i));
+					rboxes[2*(*num)+0].xyz[i] = rboxes[0].xyz[i] + pshift; 
+					rboxes[2*(*num)+1].xyz[i] = rboxes[1].xyz[i] + pshift;
+					if(rboxes[2*(*num)+0].xyz[i] > window[1].xyz[i]) goto next_shift;
+					if(rboxes[2*(*num)+1].xyz[i] < window[0].xyz[i]) goto next_shift;
+					for(v = 0; v < stride; ++v)
+						elems[stride*(*num)+v].xyz[i] = elems[v].xyz[i] + pshift; 
+				}
+				(*num)++;
+			}
+			next_shift: continue;
+		}	
+	}
+}
+
+void psi_voxelize_tet(psi_rvec* pos, psi_rvec* vel, psi_real mass, psi_rvec* rbox, psi_rvec *window, int *griddim) {
+
+	psi_int i, j, ii, jj, gridind, polyorder;
+	psi_real cm[PSI_NDIM], cv[PSI_NDIM], sxx[PSI_NDIM][PSI_NDIM], sxv[PSI_NDIM][PSI_NDIM], svv[PSI_NDIM][PSI_NDIM];
+	psi_real cwght, dwght;
+	psi_real DX[PSI_NDIM][PSI_NDIM], DV[PSI_NDIM][PSI_NDIM];
+	psi_real moments[10];
+	psi_poly curpoly;
+
+#if PSI_NDIM == 3
+	const static psi_int qinds[3][3] = {{4,5,6},{5,7,8},{6,8,9}};
+#elif PSI_NDIM == 2
+	const static psi_int qinds[2][2] = {{3,4},{4,5}};
+#endif
+
+	// deformation matrices for the input tet's mass coordinates
+	for(i = 0; i < PSI_NDIM; ++i)
+	for(j = 0; j < PSI_NDIM; ++j) {
+		DX[i][j] = pos[j+1].xyz[i]-pos[0].xyz[i];
+		DV[i][j] = vel[j+1].xyz[i]-vel[0].xyz[i];
+	}
+
+	// initialize the tet as an edge-vertex graph 
+	// and clamp it to the grid
+	psi_init_tet(&curpoly, pos);
+
+	// determine the correct poly order
+	polyorder = 0;
+	if(grid->fields[PSI_GRID_X] || grid->fields[PSI_GRID_V]) {
+		polyorder = 1;	
+	}
+	if(grid->fields[PSI_GRID_XX] || grid->fields[PSI_GRID_XV] || grid->fields[PSI_GRID_VV]) {
+		polyorder = 2;	
+	}
+
+	// initialize the voxelization iterator
+	psi_voxels vox;
+	psi_voxels_init(&vox, &curpoly, polyorder, rbox, grid);
+	while(psi_voxels_next(&vox, moments, &gridind)) {
+	
+		// get moments for this fragment from the mass coordinates 
+		if(grid->fields[PSI_GRID_X])
+			for(i = 0; i < PSI_NDIM; ++i) {
+				cm[i] = moments[0]*pos[0].xyz[i];
+				for(j = 0; j < PSI_NDIM; ++j)
+					cm[i] += moments[j+1]*DX[i][j];
+				cm[i] /= moments[0];
+			}
+		if(grid->fields[PSI_GRID_V])
+			for(i = 0; i < PSI_NDIM; ++i) {
+				cv[i] = moments[0]*vel[0].xyz[i];
+				for(j = 0; j < PSI_NDIM; ++j) 
+					cv[i] += moments[j+1]*DV[i][j];
+				cv[i] /= moments[0];
+			}
+		if(grid->fields[PSI_GRID_XX]) {
+			for(i = 0; i < PSI_NDIM; ++i) 
+			for(j = 0; j < PSI_NDIM; ++j)  {
+				sxx[i][j] = moments[0]*(pos[0].xyz[i]-cm[i])*(pos[0].xyz[j]-cm[j]);
+				for(ii = 0; ii < PSI_NDIM; ++ii) {
+					sxx[i][j] += DX[i][ii]*moments[1+ii]*(pos[0].xyz[j]-cm[j]);
+					sxx[i][j] += DX[j][ii]*moments[1+ii]*(pos[0].xyz[i]-cm[i]);
+				}
+				for(ii = 0; ii < PSI_NDIM; ++ii)
+				for(jj = 0; jj < PSI_NDIM; ++jj)
+					sxx[i][j] += DX[i][ii]*DX[j][jj]*moments[qinds[ii][jj]];
+				sxx[i][j] /= moments[0];
+			}
+		}
+		if(grid->fields[PSI_GRID_XV]) {
+			for(i = 0; i < PSI_NDIM; ++i) 
+			for(j = 0; j < PSI_NDIM; ++j)  {
+				sxv[i][j] = moments[0]*(pos[0].xyz[i]-cm[i])*(vel[0].xyz[j]-cv[j]);
+				for(ii = 0; ii < PSI_NDIM; ++ii) {
+					sxv[i][j] += DX[i][ii]*moments[1+ii]*(pos[0].xyz[j]-cm[j]);
+					sxv[i][j] += DV[j][ii]*moments[1+ii]*(vel[0].xyz[i]-cv[i]);
+				}
+				for(ii = 0; ii < PSI_NDIM; ++ii)
+				for(jj = 0; jj < PSI_NDIM; ++jj)
+					sxv[i][j] += DX[i][ii]*DV[j][jj]*moments[qinds[ii][jj]];
+				sxv[i][j] /= moments[0];
+			}
+		}
+		if(grid->fields[PSI_GRID_VV]) {
+			for(i = 0; i < PSI_NDIM; ++i) 
+			for(j = 0; j < PSI_NDIM; ++j)  {
+				svv[i][j] = moments[0]*(vel[0].xyz[i]-cv[i])*(vel[0].xyz[j]-cv[j]);
+				for(ii = 0; ii < PSI_NDIM; ++ii) {
+					svv[i][j] += DV[i][ii]*moments[1+ii]*(vel[0].xyz[j]-cv[j]);
+					svv[i][j] += DV[j][ii]*moments[1+ii]*(vel[0].xyz[i]-cv[i]);
+				}
+				for(ii = 0; ii < PSI_NDIM; ++ii)
+				for(jj = 0; jj < PSI_NDIM; ++jj)
+					svv[i][j] += DV[i][ii]*DV[j][jj]*moments[qinds[ii][jj]];
+				svv[i][j] /= moments[0];
+			}
+		}
+
+		// update everything online 
+		// TODO: go back to adding up just the raw moments...
+		cwght = mass*moments[0]/(grid->fields[PSI_GRID_M][gridind] + mass*moments[0]); 
+		dwght = grid->fields[PSI_GRID_M][gridind]/(grid->fields[PSI_GRID_M][gridind] + mass*moments[0]); 
+		if(grid->fields[PSI_GRID_XX]) for(i = 0; i < PSI_NDIM; ++i) for(j = 0; j < PSI_NDIM; ++j) {
+			grid->fields[PSI_GRID_XX][PSI_NDIM*PSI_NDIM*gridind+PSI_NDIM*i+j] = 
+				dwght*grid->fields[PSI_GRID_XX][PSI_NDIM*PSI_NDIM*gridind+PSI_NDIM*i+j] + cwght*sxx[i][j] 
+				+ cwght*dwght*(cm[i]-grid->fields[PSI_GRID_X][PSI_NDIM*gridind+i])*(cm[j]-grid->fields[PSI_GRID_X][PSI_NDIM*gridind+j]);
+		}
+		if(grid->fields[PSI_GRID_XV]) for(i = 0; i < PSI_NDIM; ++i) for(j = 0; j < PSI_NDIM; ++j) {
+			grid->fields[PSI_GRID_XV][PSI_NDIM*PSI_NDIM*gridind+PSI_NDIM*i+j] = 
+				dwght*grid->fields[PSI_GRID_XV][PSI_NDIM*PSI_NDIM*gridind+PSI_NDIM*i+j] + cwght*sxv[i][j] 
+				+ cwght*dwght*(cm[i]-grid->fields[PSI_GRID_X][PSI_NDIM*gridind+i])*(cv[j]-grid->fields[PSI_GRID_V][PSI_NDIM*gridind+j]);
+		}
+		if(grid->fields[PSI_GRID_VV]) for(i = 0; i < PSI_NDIM; ++i) for(j = 0; j < PSI_NDIM; ++j) {
+			grid->fields[PSI_GRID_VV][PSI_NDIM*PSI_NDIM*gridind+PSI_NDIM*i+j] = 
+				dwght*grid->fields[PSI_GRID_VV][PSI_NDIM*PSI_NDIM*gridind+PSI_NDIM*i+j] + cwght*svv[i][j] 
+				+ cwght*dwght*(cv[i]-grid->fields[PSI_GRID_V][PSI_NDIM*gridind+i])*(cv[j]-grid->fields[PSI_GRID_V][PSI_NDIM*gridind+j]);
+		}
+		if(grid->fields[PSI_GRID_X]) for(i = 0; i < PSI_NDIM; ++i) 
+			grid->fields[PSI_GRID_X][PSI_NDIM*gridind+i] += cwght*(cm[i]-grid->fields[PSI_GRID_X][PSI_NDIM*gridind+i]);
+		if(grid->fields[PSI_GRID_V]) for(i = 0; i < PSI_NDIM; ++i) 
+			grid->fields[PSI_GRID_V][PSI_NDIM*gridind+i] += cwght*(cv[i]-grid->fields[PSI_GRID_V][PSI_NDIM*gridind+i]);
+
+		if(grid->fields[PSI_GRID_M]) grid->fields[PSI_GRID_M][gridind] += mass*moments[0];
+	}
+}
+
+****/
