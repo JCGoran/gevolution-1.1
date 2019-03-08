@@ -12,8 +12,8 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
     memset(&grid, 0, sizeof(grid));
     grid.type = 0;
     grid.dim = 3;
-    grid.fields[0] = density.data();
-    grid.fields[1] = velocity.data();
+    grid.fields[0] = density->data();
+    grid.fields[1] = velocity->data();
     grid.n.i = localSize(0);
     grid.n.j = localSize(1);
     grid.n.k = localSize(2);
