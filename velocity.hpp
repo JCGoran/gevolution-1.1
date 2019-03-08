@@ -1,3 +1,4 @@
+#include "psi.h"
 #include "geometry.h"
 #include "refine.h"
 #include "grid.h"
