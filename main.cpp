@@ -60,6 +60,7 @@
 #include "tools.hpp"
 #include "output.hpp"
 #include "hibernation.hpp"
+#include "velocity.hpp"
 
 using namespace std;
 
@@ -214,6 +215,17 @@ int main(int argc, char **argv)
 	Field<Cplx> scalarFT;
 	Field<Cplx> SijFT;
 	Field<Cplx> BiFT;
+
+    /* init fields for PSI */
+    Field<Real> denPSI;
+    Field<Real> velPSI;
+    Field<Cplx> denPSIFT;
+    Field<Cplx> velPSIFT;
+    denPSI.initialize(lat, 1);
+    velPSI.initialize(lat, 3);
+    PlanFFT<Cplx> plan_denPSI(&denPSI, &denPSIFT);
+    PlanFFT<Cplx> plan_velPSI(&velPSI, &velPSIFT);
+
 	source.initialize(lat,1);
 	phi.initialize(lat,1);
 	chi.initialize(lat,1);
@@ -305,6 +317,9 @@ int main(int argc, char **argv)
 		COUT << " error: baryon_flag > 1 after IC generation, something went wrong in IC generator!" << endl;
 		parallel.abortForce();
 	}
+
+
+    test_id(&pcls_cdm, ic.numtile[0], &denPSI, &velPSI);
 	
 	numspecies = 1 + sim.baryon_flag + cosmo.num_ncdm;	
 	parallel.max<double>(maxvel, numspecies);

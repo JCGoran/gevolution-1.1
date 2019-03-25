@@ -1,13 +1,26 @@
+#include "LATfield2.hpp"
+#include "metadata.hpp"
+#include "class_tools.hpp"
+#include "background.hpp"
+#include "Particles_gevolution.hpp"
+#include "gevolution.hpp"
+#include "ic_basic.hpp"
+#include "ic_read.hpp"
+
 #include "psi.h"
 #include "geometry.h"
 #include "refine.h"
 #include "grid.h"
+#include "mesh.h"
+
+using namespace std;
+using namespace LATfield2;
 
 void psi_aabb(psi_rvec* pos, psi_int nverts, psi_rvec* rbox);
 psi_int psi_aabb_periodic(psi_rvec* pos, psi_rvec* rbox, psi_rvec* window, psi_rvec* box);
 
 template<typename part, typename part_info, typename part_dataType>
-void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double boxsize, Field<Real> *density, Field<Real> *velocity)
+void test_id(Particles<part, part_info, part_dataType> * pcls, int numtile, Field<Real> *density, Field<Real> *velocity)
 {
     Site xPart(pcls->lattice());
     typename std::list<part>::iterator it;
@@ -18,15 +31,15 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
     grid.dim = 3;
     grid.fields[0] = density->data();
     grid.fields[1] = velocity->data();
-    grid.n.i = pcls->lattice().localSize(0);
-    grid.n.j = pcls->lattice().localSize(1);
-    grid.n.k = pcls->lattice().localSize(2);
+    grid.n.i = pcls->lattice().sizeLocal(0);
+    grid.n.j = pcls->lattice().sizeLocal(1);
+    grid.n.k = pcls->lattice().sizeLocal(2);
     grid.window[0].x = 0.;
-    grid.window[0].y = 1.0*pcls->lattice().coordSkip(0)/pcls->lattice().size(1);
-    grid.window[0].z = 1.0*pcls->lattice().coordSkip(1)/pcls->lattice().size(2);
+    grid.window[0].y = 1.0*pcls->lattice().coordSkip()[0]/pcls->lattice().size(1);
+    grid.window[0].z = 1.0*pcls->lattice().coordSkip()[1]/pcls->lattice().size(2);
     grid.window[1].x = 1.;
-    grid.window[1].y = 1.0*(pcls->lattice().coordSkip(0) + pcls->lattice().sizeLocal(1))/pcls->lattice().size(1);
-    grid.window[1].z = 1.0*(pcls->lattice().coordSkip(1) + pcls->lattice().sizeLocal(2))/pcls->lattice().size(2);
+    grid.window[1].y = 1.0*(pcls->lattice().coordSkip()[0] + pcls->lattice().sizeLocal(1))/pcls->lattice().size(1);
+    grid.window[1].z = 1.0*(pcls->lattice().coordSkip()[1] + pcls->lattice().sizeLocal(2))/pcls->lattice().size(2);
     grid.d.x = (grid.window[1].x - grid.window[0].x)/grid.n.i;
     grid.d.y = (grid.window[1].y - grid.window[0].y)/grid.n.j;
     grid.d.z = (grid.window[1].z - grid.window[0].z)/grid.n.k;
@@ -60,27 +73,32 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, long *ID, double 
     box[1].y = 1.;
     box[1].z = 1.;
 
-
-
     psi_rvec pos[8], vel[8];
 
+    int cube_ids[8];
+
     for (xPart.first(); xPart.test(); xPart.next()){
         for (it = (pcls->field())(xPart).parts.begin(); it != (pcls->field())(xPart).parts.end(); ++it){
-            for (psi_int i = 0; i < 8; ++i){
-                // find the right 8 particles
-                if (it->ID == ID[i]){
-                    pos[i].x = it->pos[0];
-                    pos[i].y = it->pos[1];
-                    pos[i].z = it->pos[2];
-                    vel[i].x = it->vel[0];
-                    vel[i].y = it->vel[1];
-                    vel[i].z = it->vel[2];
+            Site xPart2(pcls->lattice());
+            typename std::list<part>::iterator it2;
+            gevolution_lagrangian_cube_indices(it->ID, numtile, cube_ids);
+
+            for (xPart2.first(); xPart2.test(); xPart2.next()){
+                for (it2 = (pcls->field())(xPart2).parts.begin(); it2 != (pcls->field())(xPart2).parts.end(); ++it2){
+                    for (psi_int i = 0; i < 8; ++i){
+                        // find the right 8 particles
+                        if (it2->ID == cube_ids[i]){
+                            pos[i].x = it2->pos[0];
+                            pos[i].y = it2->pos[1];
+                            pos[i].z = it2->pos[2];
+                            vel[i].x = it2->vel[0];
+                            vel[i].y = it2->vel[1];
+                            vel[i].z = it2->vel[2];
+                        }
+                    }
                 }
             }
-        }
-    }
-    for (xPart.first(); xPart.test(); xPart.next()){
-        for (it = (pcls->field())(xPart).parts.begin(); it != (pcls->field())(xPart).parts.end(); ++it){
+
 
             // a local copy of the element, in case it's modified
             // make it periodic, get its bounding box, and check it against the grid
