@@ -223,6 +223,8 @@ int main(int argc, char **argv)
     Field<Cplx> velPSIFT;
     denPSI.initialize(lat, 1);
     velPSI.initialize(lat, 3);
+    denPSIFT.initialize(latFT, 1);
+    velPSIFT.initialize(latFT, 3);
     PlanFFT<Cplx> plan_denPSI(&denPSI, &denPSIFT);
     PlanFFT<Cplx> plan_velPSI(&velPSI, &velPSIFT);
 
@@ -320,6 +322,10 @@ int main(int argc, char **argv)
 
 
     test_id(&pcls_cdm, ic.numtile[0], &denPSI, &velPSI);
+
+    //for (x.first(); x.test(); x.next())
+    //   COUT << x << ", " << velPSI(x, 0) << ", " << velPSI(x, 1) << ", " << velPSI(x, 2) << endl;
+
 	
 	numspecies = 1 + sim.baryon_flag + cosmo.num_ncdm;	
 	parallel.max<double>(maxvel, numspecies);

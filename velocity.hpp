@@ -10,7 +10,6 @@
 #include "psi.h"
 #include "geometry.h"
 #include "refine.h"
-#include "grid.h"
 #include "mesh.h"
 
 using namespace std;
@@ -18,6 +17,7 @@ using namespace LATfield2;
 
 void psi_aabb(psi_rvec* pos, psi_int nverts, psi_rvec* rbox);
 psi_int psi_aabb_periodic(psi_rvec* pos, psi_rvec* rbox, psi_rvec* window, psi_rvec* box);
+void psi_make_ghosts(psi_rvec* elems, psi_rvec* rboxes, psi_int* num, psi_int stride, psi_rvec* window, psi_mesh* mesh);
 
 template<typename part, typename part_info, typename part_dataType>
 void test_id(Particles<part, part_info, part_dataType> * pcls, int numtile, Field<Real> *density, Field<Real> *velocity)
@@ -35,16 +35,16 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, int numtile, Fiel
     grid.n.j = pcls->lattice().sizeLocal(1);
     grid.n.k = pcls->lattice().sizeLocal(2);
     grid.window[0].x = 0.;
-    grid.window[0].y = 1.0*pcls->lattice().coordSkip()[0]/pcls->lattice().size(1);
-    grid.window[0].z = 1.0*pcls->lattice().coordSkip()[1]/pcls->lattice().size(2);
+    grid.window[0].y = 1.0*pcls->lattice().coordSkip()[1]/pcls->lattice().size(1);
+    grid.window[0].z = 1.0*pcls->lattice().coordSkip()[0]/pcls->lattice().size(2);
     grid.window[1].x = 1.;
-    grid.window[1].y = 1.0*(pcls->lattice().coordSkip()[0] + pcls->lattice().sizeLocal(1))/pcls->lattice().size(1);
-    grid.window[1].z = 1.0*(pcls->lattice().coordSkip()[1] + pcls->lattice().sizeLocal(2))/pcls->lattice().size(2);
+    grid.window[1].y = 1.0*(pcls->lattice().coordSkip()[1] + pcls->lattice().sizeLocal(1))/pcls->lattice().size(1);
+    grid.window[1].z = 1.0*(pcls->lattice().coordSkip()[0] + pcls->lattice().sizeLocal(2))/pcls->lattice().size(2);
     grid.d.x = (grid.window[1].x - grid.window[0].x)/grid.n.i;
     grid.d.y = (grid.window[1].y - grid.window[0].y)/grid.n.j;
     grid.d.z = (grid.window[1].z - grid.window[0].z)/grid.n.k;
 
-	psi_int e, nghosts, tind, internal_rtree, e1, t1;
+	psi_int e, nghosts, tind;
 
 	// a local copy of the position in case it is modified due to periodicity
 	psi_int vpere = 8;
@@ -83,6 +83,8 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, int numtile, Fiel
             typename std::list<part>::iterator it2;
             gevolution_lagrangian_cube_indices(it->ID, numtile, cube_ids);
 
+            int counter = 0;
+
             for (xPart2.first(); xPart2.test(); xPart2.next()){
                 for (it2 = (pcls->field())(xPart2).parts.begin(); it2 != (pcls->field())(xPart2).parts.end(); ++it2){
                     for (psi_int i = 0; i < 8; ++i){
@@ -94,11 +96,13 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, int numtile, Fiel
                             vel[i].x = it2->vel[0];
                             vel[i].y = it2->vel[1];
                             vel[i].z = it2->vel[2];
+                            ++counter;
                         }
                     }
+                    if (counter == 8) break;
                 }
             }
-
+            cout << "counter is: " << counter << endl;
 
             // a local copy of the element, in case it's modified
             // make it periodic, get its bounding box, and check it against the grid
@@ -116,7 +120,7 @@ void test_id(Particles<part, part_info, part_dataType> * pcls, int numtile, Fiel
             for(psi_int t = 0; t < tetbuf.num; ++t){
                 memcpy(gpos, &tetbuf.pos[(meshdim+1)*t], (meshdim+1)*sizeof(psi_rvec));
                 psi_aabb(gpos, meshdim+1,grbox);
-                //psi_make_ghosts(gpos, grbox, &nghosts, (meshdim+1), grid->window, mesh);
+                //psi_make_ghosts(gpos, grbox, &nghosts, (meshdim+1), grid.window, mesh);
                 nghosts = 1;
                 for(psi_int g = 0; g < nghosts; ++g){
                     psi_voxelize_tet(&gpos[(meshdim+1)*g], &tetbuf.vel[(meshdim+1)*t], tetbuf.mass[t], &grbox[2*g], &grid);
@@ -303,7 +307,7 @@ void Particles<part,part_info,part_dataType>::coutPart(long ID)
 
 }
 
-
+*/
 void psi_make_ghosts(psi_rvec* elems, psi_rvec* rboxes, psi_int* num, psi_int stride, psi_rvec* window, psi_mesh* mesh) {
 
 	psi_int i, p, v, pflags;
@@ -335,6 +339,7 @@ void psi_make_ghosts(psi_rvec* elems, psi_rvec* rboxes, psi_int* num, psi_int st
 		}	
 	}
 }
+/*
 
 void psi_voxelize_tet(psi_rvec* pos, psi_rvec* vel, psi_real mass, psi_rvec* rbox, psi_rvec *window, int *griddim) {
 
