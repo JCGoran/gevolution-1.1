@@ -230,13 +230,10 @@ int main(int argc, char **argv)
 	PlanFFT<Cplx> plan_Bi_check(&Bi_check, &BiFT_check);
 #endif
 
-    Field<Real> scalarcross[sim.num_pk];
     Field<Cplx> scalarFTcross[sim.num_pk];
-    PlanFFT<Cplx> plan_scalarcross[sim.num_pk];
     for (int i = 0; i<sim.num_pk; ++i){
-        scalarcross[i].initialize(lat, 1);
         scalarFTcross[i].initialize(latFT, 1);
-        plan_scalarcross[i].initialize(&scalarcross[i], &scalarFTcross[i]);
+        scalarFTcross[i].alloc();
     }
 
 
